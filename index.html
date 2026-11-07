@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>生徒会人生すごろく</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap">
+<style>
+/* Layout: 人生のステージごとにマスを並べ、分岐は2レーンで表示。下に手番パネルと実況ログ */
+:root{
+  --bg:#e9edf5; --panel:#ffffff; --ink:#1a2034; --muted:#5d6680; --line:#cfd6e4;
+  --accent:#c0283d; --gold:#b8901a;
+  --sq-hide:#f4f6fa; --sq-money:#f6e7b8; --sq-love:#f9d2dc; --sq-bad:#d9dde7; --sq-job:#cdebe6; --sq-spec:#e3d7f5;
+  --display:"Dela Gothic One","Zen Kaku Gothic New",system-ui,sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11152a; --panel:#1b2141; --ink:#e9ecf7; --muted:#9aa3c2; --line:#2e3660;
+  --accent:#ff5a70; --gold:#e8c35a;
+  --sq-hide:#222949; --sq-money:#4a3f1c; --sq-love:#552535; --sq-bad:#2a2f45; --sq-job:#1d4842; --sq-spec:#3a2d5a;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11152a; --panel:#1b2141; --ink:#e9ecf7; --muted:#9aa3c2; --line:#2e3660;
+  --accent:#ff5a70; --gold:#e8c35a;
+  --sq-hide:#222949; --sq-money:#4a3f1c; --sq-love:#552535; --sq-bad:#2a2f45; --sq-job:#1d4842; --sq-spec:#3a2d5a;
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(26px,7vw,40px);line-height:1.15;margin:0;text-wrap:balance}
+h1 small{display:block;font-family:var(--body);font-weight:700;font-size:13px;letter-spacing:.12em;color:var(--accent)}
+.sub{color:var(--muted);margin:4px 0 0;font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+button{font-family:var(--body);font-weight:900;cursor:pointer;border:none;border-radius:10px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.btn{background:var(--accent);color:#fff;padding:12px 20px;font-size:16px}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.lbl{font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:700;margin:0 0 8px}
+.dot{width:14px;height:14px;border-radius:50%;flex:none;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--ink)}
+/* setup */
+.setup{display:flex;flex-direction:column;gap:12px}
+.count{display:flex;gap:8px;flex-wrap:wrap}
+.count button{padding:8px 16px;background:var(--sq-hide);color:var(--ink);border:2px solid var(--line)}
+.count button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.names{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:460px){.names{grid-template-columns:1fr}}
+.nr{display:flex;align-items:center;gap:8px}
+.nr input[type=text]{flex:1;min-width:0;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.bot{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:var(--muted);flex:none;cursor:pointer}
+.bot input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+/* board */
+.board{display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow:auto;padding-right:2px}
+.seg{display:flex;flex-direction:column;gap:6px}
+.stg{font-family:var(--display);font-size:14px;display:flex;align-items:baseline;gap:8px}
+.stg em{font-family:var(--body);font-style:normal;font-size:11px;color:var(--muted);font-weight:700}
+.fork{border:2px dashed var(--line);border-radius:12px;padding:8px}
+.lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:8px}
+.ln small{font-weight:700;color:var(--muted);margin-left:6px}
+.cut{position:relative;height:120px;border-radius:10px;overflow:hidden;margin-bottom:10px;display:grid;place-items:center;background:var(--sq-hide);border:1px solid var(--line)}
+.cut img{width:100%;height:100%;object-fit:cover;display:block}
+.cut .big{font-family:var(--display);font-size:clamp(28px,9vw,44px);line-height:1;text-align:center;padding:0 12px}
+.cut .mk{position:absolute;top:6px;left:8px;font-size:10px;letter-spacing:.2em;font-weight:900;color:var(--muted)}
+.cut.money{background:var(--sq-money)}.cut.love{background:var(--sq-love)}.cut.bad{background:var(--sq-bad)}
+.cut.job{background:var(--sq-job)}.cut.spec{background:var(--sq-spec)}.cut.chaos{background:var(--accent);color:#fff;border-color:var(--accent)}
+.cut.chaos .mk{color:#fff}
+.cut.stop{background:var(--ink);color:var(--panel)}.cut.stop .mk{color:var(--panel)}
+.sq.chaos{background:repeating-linear-gradient(45deg,var(--accent) 0 6px,var(--gold) 6px 12px);color:#fff;border-color:var(--accent);text-shadow:0 1px 2px #0008}
+.event{display:block}
+.lane{min-width:0;display:flex;flex-direction:column;gap:4px}
+.ln{font-size:12px;font-weight:900;color:var(--accent)}
+.tiles{display:flex;flex-wrap:wrap;gap:4px}
+.sq{position:relative;width:46px;height:46px;border-radius:8px;background:var(--sq-hide);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;padding:2px;text-align:center;cursor:pointer;color:var(--ink);font:inherit}
+.sq .l{font-size:11px;font-weight:900;line-height:1.1;word-break:keep-all}
+.sq.rand{border-style:dashed;border-color:var(--accent)}
+.sq.rand .l{font-family:var(--display);font-size:18px;color:var(--accent)}
+.sq.rand.chaos .l{color:#fff}
+.sq.money{background:var(--sq-money)} .sq.love{background:var(--sq-love)} .sq.bad{background:var(--sq-bad)}
+.sq.job{background:var(--sq-job)} .sq.spec{background:var(--sq-spec)}
+.sq.stop{background:var(--accent);color:#fff;border-color:var(--accent);width:56px}
+.sq.stop::after{content:"止";position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--gold);color:#fff;font-size:10px;display:grid;place-items:center}
+.sq.start,.sq.goal{background:var(--ink);color:var(--panel);border-color:var(--ink);width:56px}
+.sq.hit{box-shadow:0 0 0 3px var(--gold)}
+.toks{position:absolute;bottom:-5px;left:0;right:0;display:flex;justify-content:center;gap:1px}
+.toks .dot{width:12px;height:12px;border-width:1px}
+.info{font-size:12px;color:var(--muted);min-height:20px;margin-top:8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11px;color:var(--muted);margin-top:6px}
+.legend span{display:flex;align-items:center;gap:4px}
+.legend i{width:12px;height:12px;border-radius:3px;border:1px solid var(--line)}
+/* turn */
+.turn{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.die{width:72px;height:72px;border-radius:14px;background:var(--panel);border:3px solid var(--ink);display:grid;place-items:center;font-family:var(--display);font-size:38px}
+.die.roll{animation:wob .12s infinite alternate}
+@keyframes wob{to{transform:rotate(8deg) scale(1.05)}}
+@media (prefers-reduced-motion:reduce){.die.roll{animation:none}}
+.who{font-size:13px;color:var(--muted)}
+.who b{font-family:var(--display);font-weight:400;font-size:22px;color:var(--ink);display:flex;align-items:center;gap:8px}
+.event{margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--bg);border-left:4px solid var(--accent);min-height:56px}
+.event .et{font-family:var(--display);font-size:16px;display:block}
+.choices{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.choices:empty{display:none}
+.ch{text-align:left;padding:10px 12px;background:var(--panel);color:var(--ink);border:2px solid var(--accent);font-size:14px}
+.ch:disabled{opacity:.6;cursor:default}
+.dbg{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+.dbg select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.dbg .btn{padding:6px 12px;font-size:13px}
+.pg{display:inline-block;margin-left:4px;padding:0 8px;border-radius:99px;background:var(--gold);color:#fff;font-size:12px;font-weight:900}
+.pt{color:var(--accent);font-weight:900}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.chip{font-size:10px;font-weight:900;padding:2px 8px;border-radius:99px;border:1px solid var(--gold);color:var(--ink);cursor:help;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.tip{position:fixed;z-index:50;max-width:min(260px,calc(100vw - 16px));background:var(--ink);color:var(--panel);font-size:12px;line-height:1.5;padding:8px 10px;border-radius:8px;pointer-events:none;box-shadow:0 4px 14px #0004}
+.tip b{display:block;font-size:13px;color:var(--gold)}
+details.pl{font-size:12px;color:var(--muted);margin-top:8px}
+details.pl summary{cursor:pointer;font-weight:700}
+details.pl dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:8px 0 0}
+details.pl dt{font-weight:900;color:var(--ink)}details.pl dd{margin:0}
+/* players */
+.ps{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
+.p{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px}
+.p.now{border:2px solid var(--accent)}
+.p .nm{display:flex;align-items:center;gap:6px;font-weight:900;font-size:15px;flex-wrap:wrap}
+.p .row{display:flex;justify-content:space-between;gap:8px;color:var(--muted)}
+.p .row span:last-child{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.tag{display:inline-block;font-size:10px;padding:0 6px;border-radius:99px;background:var(--sq-love)}
+.tag.b{background:var(--sq-job)}
+.log{max-height:240px;overflow:auto;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.log div{padding-bottom:6px;border-bottom:1px dashed var(--line)}
+/* result */
+.rank{display:flex;flex-direction:column;gap:8px}
+.rank .r{display:grid;grid-template-columns:40px 1fr auto;gap:10px;align-items:center;padding:10px;border-radius:10px;background:var(--bg)}
+.rank .pos{font-family:var(--display);font-size:24px;color:var(--gold);text-align:center}
+.rank .sc{font-weight:900;font-variant-numeric:tabular-nums}
+.title{font-size:12px;color:var(--accent);font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1><small>テーブルゲーム部 自作</small>生徒会人生すごろく</h1>
+    <p class="sub">入学から老後まで。固定マスは年代や仕事にまつわる出来事、「？」のイベントマスは事故・恋・幸運など、止まるたびに何が起きるかわからない。止マスでは必ず止まり、進路も職業も結婚も、全部サイコロの出目で決まる。</p>
+  </header>
+
+  <section id="setup" class="card setup">
+    <p class="lbl">参加人数</p>
+    <div class="count" id="count"></div>
+    <p class="lbl">プレイヤー名</p>
+    <div class="names" id="names"></div>
+    <div class="actions">
+      <button class="btn" id="start">ゲーム開始</button>
+      <button class="btn ghost" id="allbot">全員BOTにする</button>
+    </div>
+  </section>
+
+  <section id="game" hidden>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card" style="padding:12px">
+        <div class="board" id="board"></div>
+        <div class="info" id="info">マスをタップすると中身を確認できる（「？」は止まるたびにランダム）</div>
+        <div class="legend">
+          <span><i style="background:var(--sq-money)"></i>お金</span>
+          <span><i style="background:var(--sq-love)"></i>恋愛・家族</span>
+          <span><i style="background:var(--sq-job)"></i>仕事・給料</span>
+          <span><i style="background:var(--sq-spec)"></i>移動・交換</span>
+          <span><i style="background:var(--sq-bad)"></i>トラブル</span>
+          <span><i style="background:var(--sq-hide);border:1px dashed var(--accent)"></i>？イベント（毎回ランダム）</span>
+          <span><i style="background:repeating-linear-gradient(45deg,var(--accent) 0 3px,var(--gold) 3px 6px)"></i>？イベント（ハチャメチャ多め）</span>
+        </div>
+        <details class="pl"><summary>パッシブ一覧（プレイヤー欄のバッジは長押し／カーソルで効果表示）</summary><dl id="plist"></dl></details>
+      </div>
+      <div class="card">
+        <div class="turn">
+          <div class="die" id="die">?</div>
+          <div class="who" id="who"></div>
+        </div>
+        <div class="event" id="event"></div>
+        <div class="choices" id="choices"></div>
+        <div class="actions">
+          <button class="btn" id="roll">サイコロを振る</button>
+          <button class="btn ghost" id="reset">最初から</button>
+        </div>
+        <div class="dbg">
+          <span>BOT速度</span>
+          <select id="speed">
+            <option value="1">ふつう</option>
+            <option value="0.3">速い</option>
+            <option value="0">爆速</option>
+          </select>
+          <button class="btn ghost" id="pause">BOT一時停止</button>
+          <span id="turns" style="margin-left:auto;font-variant-numeric:tabular-nums">0ターン</span>
+        </div>
+      </div>
+      <div class="ps" id="ps"></div>
+      <div class="card">
+        <p class="lbl">実況ログ（新しい順）</p>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="result" class="card" hidden>
+    <p class="lbl">最終結果（所持金＋子ども30万＋孫10万＋持ち家120万）</p>
+    <div class="rank" id="rank"></div>
+    <div class="actions"><button class="btn" id="again">もう一回遊ぶ</button></div>
+  </section>
+</div>
+
+<script>
+const COLORS=["#e0384f","#2f7de1","#f2b705","#22a06b"];
+const DEF=["会長","副会長","書記","会計"];
+const $=id=>document.getElementById(id);
+const rnd=n=>Math.floor(Math.random()*n);
+const pick=a=>a[rnd(a.length)];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let N=4,P=[],cur=0,busy=false,goalOrder=0,SPD=1,paused=false,turns=0,gameId=0;
+const BOTS=[false,false,false,false];
+const nm=p=>`<b style="color:${p.color}">${esc(p.name)}</b>`;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms*SPD));
+
+// ===== 職業 =====
+const JOBS=[
+ {n:"医者",p:70,uni:1},{n:"弁護士",p:65,uni:1},{n:"パイロット",p:60,uni:1},{n:"官僚",p:55,uni:1},
+ {n:"研究者",p:45,uni:1},{n:"起業家",r:[0,120],uni:1},
+ {n:"公務員",p:35},{n:"料理人",p:35},{n:"保育士",p:30},{n:"探偵",p:40},{n:"執事",p:45},{n:"農家",p:35},
+ {n:"漫画家",r:[10,70]},{n:"プロゲーマー",r:[5,80]},{n:"動画配信者",r:[0,100]},{n:"ラッパー",r:[0,60]},
+ {n:"ボードゲーム作家",p:25},{n:"メイド喫茶店長",p:40}
+];
+const jobTxt=j=>j.r?`${j.n}（給料${j.r[0]}〜${j.r[1]}万・毎回ランダム）`:`${j.n}（給料${j.p}万）`;
+function salary(me){if(me.retired)return 15;if(!me.job)return me.hiki?3:5;const j=me.job;return j.r?j.r[0]+rnd(j.r[1]-j.r[0]+1):j.p}
+
+// ===== 共通ヘルパー =====
+const others=me=>P.filter(x=>x!==me);
+const singles=me=>others(me).filter(x=>x.spouse===null);
+function collect(me,v){let t=0;others(me).forEach(x=>{x.money-=v;t+=v});me.money+=t;return `（+${t}万）`}
+function giveAll(me,v){let t=0;others(me).forEach(x=>{x.money+=v;t+=v});me.money-=t;return `（-${t}万）`}
+function give(a,b,v){a.money-=v;b.money+=v;return ""}
+function divorce(a){if(a.spouse===null)return null;const b=P[a.spouse];a.spouse=null;b.spouse=null;a.divorces++;b.divorces++;return b}
+// ===== パッシブ =====
+const PASS={
+ solo:{c:"結婚式場で大玉砕（出目6）",n:"生涯独身",d:"もう結婚できない。結婚・恋愛マスでは代わりに独身貴族手当 +10万"},
+ love:{c:"告白に成功すると60%",n:"恋愛マスター",d:"告白の成功率が45%→80%に"},
+ heart:{c:"告白に失敗すると40%",n:"失恋の傷",d:"告白するたびに古傷がうずいて -5万"},
+ loot:{c:"既婚者と結婚すると30%",n:"略奪愛の業",d:"夫婦げんか・浮気疑惑・熟年離婚のマスで必ず離婚する"},
+ kids:{c:"子どもが6人以上",n:"子だくさん",d:"子どもが生まれるとき、さらに+1人"},
+ legs:{c:"3マス以上進むイベントを3回踏む",n:"健脚",d:"「進む」マスで1マス多く進む"},
+ klutz:{c:"戻るイベントを2回踏む",n:"ドジっ子",d:"「戻る」マスで1マス多く戻る"},
+ rich:{c:"実家からの援助で45%",n:"財閥の後ろ盾",d:"給料日に +10万"},
+ curse:{c:"呪いの人形を拾うと50%",n:"呪われし者",d:"給料日に -10万。お祓いマスで解ける"},
+ hero:{c:"異世界転生すると50%",n:"勇者",d:"隕石・台風など全員が被害を受けるマスを無効化"},
+ net:{c:"引きこもりになる／配信バズで80%",n:"ネット強者",d:"配信・ネトゲの収入が2倍、炎上を無効化"},
+ gamble:{c:"運試しで大勝ちすると60%",n:"ギャンブラー",d:"運試しマス（仮想通貨・宝の地図・バンド）の成功率 +25%"},
+ ufo:{c:"宇宙人にさらわれると70%",n:"宇宙の技術",d:"サイコロの出目 +1"},
+ slave:{c:"ブラック企業に就職",n:"社畜魂",d:"「1回休み」のマスでも休まず出勤し、給料1回分をもらう"},
+ elite:{c:"MARCH合格",n:"学歴エリート",d:"給料日に +5万"},
+};
+const has=(p,k)=>p.pass.includes(k);
+function gain(p,k){if(has(p,k))return "";p.pass.push(k);if(k==="solo"&&p.spouse!==null){}return ` <span class="pg">パッシブ獲得：${PASS[k].n}</span>`}
+function gainAt(p,k,need){p.cnt[k]=(p.cnt[k]||0)+1;return p.cnt[k]>=need?gain(p,k):""}
+function gainP(p,k,pr){return Math.random()<pr?gain(p,k):""}
+function lose(p,k){const i=p.pass.indexOf(k);if(i<0)return "";p.pass.splice(i,1);return ` <span class="pg">パッシブ消滅：${PASS[k].n}</span>`}
+const trig=k=>`<span class="pt">【${PASS[k].n}】</span>`;
+function luck(me,p){return Math.random()<p+(has(me,"gamble")?.25:0)}
+const lt=me=>has(me,"gamble")?trig("gamble"):"";
+function soloBonus(p){p.money+=10;return `${trig("solo")}${nm(p)}は結婚できない身。独身貴族手当 +10万`}
+function marry(a,b){
+  const lone=[a,b].find(x=>has(x,"solo"));
+  if(lone)return soloBonus(lone);
+  if(a.spouse!==null&&P[a.spouse]===b)return `${nm(a)}と${nm(b)}はすでに夫婦。改めて愛を誓った。`;
+  let drama="",g="";
+  if(b.spouse!==null)g+=gainP(a,"loot",.3);
+  if(a.spouse!==null)g+=gainP(b,"loot",.3);
+  [a,b].forEach(x=>{if(x.spouse!==null){const ex=divorce(x);drama+=`${nm(x)}は${nm(ex)}と電撃離婚！ `}});
+  a.spouse=P.indexOf(b);b.spouse=P.indexOf(a);a.marriages++;b.marriages++;
+  let gift=0;P.forEach(x=>{if(x!==a&&x!==b){x.money-=5;gift+=5}});a.money+=gift;
+  return `${drama}${nm(a)}と${nm(b)}が結婚！${gift?`ご祝儀 +${gift}万`:""}${g}`;
+}
+function matchSingle(me,how){
+  if(has(me,"solo"))return `${how}…${soloBonus(me)}`;
+  if(me.spouse!==null){me.skip=1;return `既婚なのに${how}…配偶者にバレて1回休み`}
+  const c=singles(me).filter(x=>!has(x,"solo"));if(!c.length)return `${how}けど、結婚できる独身の人が誰もいなかった`;
+  return marry(me,pick(c));
+}
+function confess(me){
+  if(has(me,"solo"))return soloBonus(me);
+  let pre="";if(has(me,"heart")){me.money-=5;pre=`${trig("heart")}古傷がうずく -5万。`}
+  const t=pick(others(me));
+  const p=has(me,"love")?.8:.45;
+  if(Math.random()<p)return `${pre}${has(me,"love")?trig("love"):""}${nm(t)}に告白…まさかのOK！ ${marry(me,t)}${gainP(me,"love",.6)}`;
+  me.money-=10;return `${pre}${nm(t)}に告白…撃沈。やけ食いで -10万${gainP(me,"heart",.4)}`;
+}
+function baby(me,n){
+  if(me.spouse===null){me.money-=5;return `独身なので親戚の子にお祝いだけ渡した -5万`}
+  let pre="";if(has(me,"kids")){n++;pre=trig("kids")}
+  const sp=P[me.spouse];me.kids+=n;sp.kids+=n;
+  let g="";if(me.kids>=6){g=gain(me,"kids")+gain(sp,"kids")}
+  return `${pre}${nm(me)}と${nm(sp)}に子どもが${n}人！（子ども${me.kids}人）${g}`;
+}
+function crisis(me,pct,txt){
+  if(me.spouse===null)return `${txt}…と思ったら独身だった。平和。`;
+  const lootT=has(me,"loot");if(lootT)pct=1;
+  if(Math.random()<pct){const ex=divorce(me);const h=Math.floor(Math.max(me.money,0)/2);me.money-=h;ex.money+=h;return `${lootT?trig("loot"):""}${txt}。${nm(ex)}と離婚、財産分与で${h}万が相手へ`}
+  me.money-=20;return `${txt}。なんとか関係修復、指輪を買い直して -20万`;
+}
+const M=(c,s,t,v,d)=>({c,s,t,d:me=>{me.money+=v;return `${d} ${v>0?"+":""}${v}万`}});
+const MV=(s,t,v,d)=>({c:"spec",s,t,d:me=>{
+  let w=v,x="";
+  if(v>0&&has(me,"legs")){w++;x=`${trig("legs")}さらに1マス`}
+  if(v<0&&has(me,"klutz")){w--;x=`${trig("klutz")}さらに1マス`}
+  const g=v>=3?gainAt(me,"legs",3):v<0?gainAt(me,"klutz",2):"";
+  return [d+x+g,w]}});
+const SK=(s,t,d)=>({c:"bad",s,t,d:me=>{
+  if(has(me,"slave")&&me.job&&!me.retired){const v=salary(me);me.money+=v;return `${d}…${trig("slave")}でも休まず出勤！ 給料 +${v}万`}
+  me.skip=1;return d+"。1回休み"}});
+function shrine(me){if(has(me,"curse"))return "お祓いをしてもらい呪いが解けた！"+lose(me,"curse");me.money+=5;return "お守りを買ったら気持ちが軽くなった。なぜか小銭を拾う +5万"}
+
+// ===== イベントプール =====
+const POOL={
+school:[
+ M("money","満点","徹夜で全教科満点",20,"学年1位の奨学金"),
+ {c:"money",s:"投げ銭",t:"文化祭でラップ披露",d:me=>`まさかの大ウケ。全員から5万ずつ投げ銭${collect(me,5)}`},
+ MV("誤配","ラブレター誤配達",-2,"想い人の下駄箱のつもりが校長の靴箱だった。2マス戻る"),
+ SK("花火","夏の花火大会","誘う勇気が出ないまま夏が終わった"),
+ MV("全国","部活で全国大会",3,"勢いに乗って3マス進む"),
+ M("money","転売","購買のパン買い占め",15,"人気の焼きそばパンを転売（評判はガタ落ち）"),
+ MV("迷子","修学旅行で迷子",-2,"集合場所がわからず2マス戻る"),
+ M("money","銘柄","コーヒー銘柄当て",10,"生徒会室の銘柄当てで全問正解"),
+ {c:"job",s:"選挙",t:"生徒会選挙に出馬",d:me=>{if(Math.random()<.5){me.money+=20;return "演説が神がかって当選！活動費 +20万"}me.money-=10;return "演説で噛みまくって落選。ポスター代 -10万"}},
+ {c:"love",s:"相談",t:"恋愛相談に乗りすぎ",d:me=>{const t=pick(others(me));give(me,t,5);return `${nm(t)}の相談に付き合ったら自分の恋が進まない。お茶代で${nm(t)}に5万`}},
+ {c:"money",s:"神経衰弱",t:"神経衰弱で無双",d:me=>`記憶力で全員から3万ずつ巻き上げた${collect(me,3)}`},
+ SK("職員室","テスト中の疑惑","消しゴムの公式メモが見つかって職員室へ"),
+],
+campus:[
+ M("bad","合宿","サークル合宿",-15,"飲み会続きで散財"),
+ SK("留年","単位を落とした","まさかの留年"),
+ M("money","起業","学生起業がバズる",40,"アプリが大ヒット"),
+ M("money","論文","教授の手伝い",15,"論文に名前が載って謝礼"),
+ M("money","ミスコン","学園祭コンテスト優勝",20,"賞金ゲット"),
+ M("money","大富豪","バイト先の秘密",30,"店長が実は大富豪で臨時ボーナス"),
+ MV("留学","海外留学",3,"視野が広がって3マス進む"),
+ MV("寝過ごし","図書館で寝過ごす",-2,"閉館まで寝てしまい2マス戻る"),
+ {c:"love",s:"合コン",t:"インカレ合コン",d:me=>matchSingle(me,"合コンで運命を探した")},
+],
+work:[
+ M("bad","スピーチ","上司の結婚式スピーチ",-10,"大滑りしてお詫びの菓子折り"),
+ M("money","コンペ","社内コンペ優勝",40,"賞金ゲット"),
+ {c:"job",s:"賞与2倍",t:"ボーナス2倍",d:me=>{const a=salary(me)+salary(me);me.money+=a;return `給料2回分が出た +${a}万`}},
+ M("money","副業","副業がバズる",30,"深夜の副業が大当たり"),
+ SK("寝坊","大事なプレゼンに寝坊","上司に呼び出された"),
+ {c:"bad",s:"奢り",t:"同僚に奢りまくる",d:me=>`見栄を張って全員に5万ずつ奢った${giveAll(me,5)}`},
+ {c:"love",s:"合コン",t:"会社帰りの合コン",d:me=>matchSingle(me,"合コンに参加した")},
+ MV("栄転","栄転",3,"本社に異動で3マス進む"),
+ M("bad","経費","経費の申請忘れ",-15,"立て替えた分が戻らない"),
+ {c:"job",s:"引き抜き",t:"ライバル会社から引き抜き",d:me=>{const j=pick(JOBS.filter(x=>me.uni||!x.uni));const was=me.job?me.job.n:"無職";me.job={...j};return `${was}から${jobTxt(j)}に転職！`}},
+],
+family:[
+ {c:"love",s:"出産",t:"子どもが生まれる",d:me=>baby(me,1)},
+ {c:"love",s:"出産",t:"子どもが生まれる",d:me=>baby(me,1)},
+ {c:"love",s:"双子",t:"双子誕生",d:me=>baby(me,2)},
+ {c:"love",s:"三つ子",t:"三つ子誕生",d:me=>baby(me,3)},
+ {c:"money",s:"天才児",t:"天才児あらわる",d:me=>{if(!me.kids)return "近所の子が全国模試1位。自分のことのように喜んだ";me.money+=25;return "子どもが全国模試1位！賞金 +25万"}},
+ SK("PTA","PTA会長に任命","会議と行事で手一杯"),
+ {c:"bad",s:"けんか",t:"夫婦げんか",d:me=>crisis(me,.35,"大げんかで家出騒動")},
+ {c:"bad",s:"旅行",t:"家族で豪華旅行",d:me=>{const v=Math.max(10,me.kids*10);me.money-=v;return `思い出はプライスレス、出費はリアル -${v}万`}},
+ M("bad","習い事","習い事を全部やらせる",-20,"ピアノ・水泳・書道・プログラミング"),
+ {c:"bad",s:"隣人",t:"隣人トラブル",d:me=>{const t=pick(others(me));give(me,t,10);return `${nm(t)}の家の塀を壊して弁償 -10万`}},
+ MV("ペット","ペットを飼う",2,"癒やされて2マス進む"),
+ {c:"money",s:"援助",t:"実家からの援助",d:me=>{me.money+=50;return "財閥の実家から仕送りが届いた +50万"+gainP(me,"rich",.45)}},
+ {c:"bad",s:"疑惑",t:"浮気疑惑",d:me=>crisis(me,.5,"スマホの通知を見られた")},
+],
+middle:[
+ M("bad","スポカー","中年の危機",-60,"衝動でスポーツカーを購入"),
+ {c:"love",s:"同窓会",t:"同窓会で再会",d:me=>matchSingle(me,"昔の想い人と再会した")},
+ {c:"money",s:"独立",t:"子どもが独立",d:me=>{const v=me.kids*10;me.money+=v;return me.kids?`仕送りが終わって家計に余裕 +${v}万`:"独立する子どもはいないけど、自分が一番自由"}},
+ {c:"bad",s:"熟年",t:"熟年離婚の危機",d:me=>crisis(me,.5,"会話のない食卓が続いた")},
+ {c:"job",s:"出世",t:"役員に出世",d:me=>{if(!me.job)return "出世する会社がなかった";if(me.job.r){me.job.r=[me.job.r[0]+10,me.job.r[1]+10]}else me.job.p+=20;return `給料アップ！ ${jobTxt(me.job)}`}},
+ M("money","商品化","趣味のボードゲームが商品化",40,"テーブルゲーム部の経験が活きた"),
+ {c:"money",s:"パーティ",t:"豪邸でホームパーティ",d:me=>`全員から手土産代10万ずつ${collect(me,10)}`},
+ SK("腰痛","ぎっくり腰","しばらく動けない"),
+ {c:"bad",s:"挙式",t:"子どもの結婚式",d:me=>{if(!me.kids)return "親友の子の結婚式で号泣しただけ";const v=me.kids*5;me.money-=v;return `式の援助で -${v}万`}},
+ MV("筋トレ","筋トレにハマる",2,"体が軽くなって2マス進む"),
+],
+elder:[
+ {c:"love",s:"孫",t:"孫が生まれる",d:me=>{if(!me.kids){me.money-=5;return "孫はいないけど近所の子にお年玉 -5万"}me.grand+=1;return `初孫！かわいすぎる（孫${me.grand}人）`}},
+ {c:"love",s:"孫だらけ",t:"孫ラッシュ",d:me=>{if(!me.kids)return "孫ラッシュ…は他人事だった";me.grand+=me.kids;return `子ども全員に孫が！ 孫${me.grand}人に`}},
+ M("bad","世界一周","世界一周旅行",-50,"豪華客船で世界一周"),
+ M("money","黒歴史","黒歴史ノート発掘",60,"若い頃のポエムノートが出版されてベストセラー"),
+ M("money","優勝","ゲートボール大会",15,"まさかの優勝賞金"),
+ M("money","自伝","自伝を出版",30,"波乱の人生が売れた"),
+ SK("ライバル","老人ホームの恋","恋のライバルが現れて眠れない"),
+ {c:"bad",s:"手紙",t:"感謝の手紙",d:me=>`人生を振り返り全員に5万ずつ配った${giveAll(me,5)}`},
+ {c:"love",s:"再婚",t:"黄昏の再婚",d:me=>matchSingle(me,"シニア婚活に参加した")},
+ MV("元気","元気すぎる",2,"毎朝のラジオ体操で2マス進む"),
+ {c:"spec",s:"バンド",t:"夢のバンドデビュー",d:me=>{if(luck(me,.4)){me.money+=50;return lt(me)+"まさかのヒット！ +50万"}me.money-=20;return "機材だけ買って解散 -20万"}},
+],
+city:[
+ M("bad","タワマン","タワマン最上階へ",-40,"景色は最高、管理費も最高"),
+ M("money","サロン","オンラインサロン主宰",40,"人生相談がウケた"),
+ M("bad","セミナー","終活セミナー",-20,"高い墓石を勧められた"),
+ MV("フェス","若者と音楽フェス",3,"ノリノリで3マス進む"),
+],
+country:[
+ M("money","豊作","家庭菜園が豊作",20,"直売所で売れまくった"),
+ M("money","カフェ","古民家カフェ開業",30,"週末だけ大行列"),
+ M("bad","イノシシ","畑にイノシシ",-15,"野菜を全部食べられた"),
+ MV("祭り","村祭りの主役",2,"神輿を担いで2マス進む"),
+ SK("温泉","温泉三昧","気持ちよすぎて"),
+]};
+
+// ===== 追加イベント =====
+POOL.school.push(
+ M("bad","弁当","早弁がバレる",-5,"没収された弁当の代わりに購買で散財"),
+ MV("廊下","廊下を全力疾走",2,"風紀委員を振り切って2マス進む"),
+ M("money","ダンス","謎のダンスが流行",15,"生徒会室で踊った動画がバズった"),
+ {c:"bad",s:"風紀",t:"風紀委員に目をつけられる",d:me=>{me.money-=10;me.skip=1;return "反省文100枚。紙代 -10万、1回休み"}},
+ M("money","バイト","秘密のバイト",20,"変装してファミレスで働いたら誰にもバレなかった"),
+);
+POOL.campus.push(
+ M("bad","教科書","教科書を全部新品で買う",-20,"中古で十分だった"),
+ MV("ゼミ","名物ゼミに合格",2,"教授に気に入られて2マス進む"),
+ M("money","賞金","ビジコン優勝",35,"寝ずに作った企画が勝った"),
+);
+POOL.work.push(
+ SK("飲み会","朝まで飲み会","二日酔いで出社できない"),
+ M("money","特許","社内で特許を取る",45,"報奨金が出た"),
+ M("bad","左遷","まさかの左遷",-25,"引っ越し代が自腹"),
+ MV("出張","海外出張",3,"マイルが貯まって3マス進む"),
+ {c:"job",s:"昇給",t:"昇給",d:me=>{if(!me.job)return "昇給する給料がなかった";if(me.job.r)me.job.r=[me.job.r[0]+5,me.job.r[1]+5];else me.job.p+=10;return `給料アップ！ ${jobTxt(me.job)}`}},
+);
+POOL.family.push(
+ M("money","懸賞","懸賞に当選",30,"家族総出で応募しまくった成果"),
+ MV("運動会","運動会で本気を出す",2,"親子リレーで1位、2マス進む"),
+ SK("夜泣き","夜泣き地獄","寝不足でふらふら"),
+ {c:"love",s:"再会",t:"幼なじみと再会",d:me=>matchSingle(me,"幼なじみとばったり再会した")},
+ M("bad","リフォーム","思いつきでリフォーム",-35,"床暖房と全自動トイレ"),
+);
+POOL.middle.push(
+ M("money","副社長","副社長に抜擢",50,"就任祝い金"),
+ SK("人間ドック","人間ドック","全項目受けたら丸一日かかった"),
+ M("bad","骨董品","骨董品にハマる",-30,"鑑定したら全部偽物"),
+ MV("マラソン","フルマラソン完走",3,"自信がついて3マス進む"),
+);
+POOL.elder.push(
+ M("money","長寿","長寿のお祝い",20,"町からお祝い金"),
+ M("bad","入れ歯","高級入れ歯",-15,"金歯にした"),
+ MV("散歩","朝の散歩が日課",2,"健脚で2マス進む"),
+);
+POOL.abroad=[
+ {c:"money",s:"カジノ",t:"ラスベガスのカジノ",d:me=>{me.money+=80;return "ルーレットで一点賭けが的中 +80万"+gainP(me,"gamble",.6)}},
+ M("bad","スリ","海外でスリに遭う",-30,"財布ごとやられた"),
+ MV("ビーチ","南の島でのんびり",2,"波に乗って2マス進む"),
+ SK("時差","時差ボケ","昼夜逆転"),
+ M("money","骨董","現地の市場で掘り出し物",40,"実は国宝級"),
+ {c:"love",s:"国際婚",t:"国際ロマンス",d:me=>matchSingle(me,"異国の地で運命を感じた")},
+ M("bad","ピラミッド","ピラミッドで迷子",-20,"ガイド代を3倍払って救出"),
+ M("money","王族","現地の王族と友達に",60,"お礼に宝石をもらった"),
+];
+POOL.freeter=[
+ {c:"money",s:"強盗撃退",t:"コンビニ夜勤で強盗撃退",d:me=>me.hiki?"テレビでニュースを見ていただけ":(me.money+=30,"モップ一本で撃退して表彰！ 金一封 +30万")},
+ {c:"love",s:"バイト恋",t:"バイト先の恋",d:me=>me.hiki?(me.skip=1,"画面の中の推しに恋をした。1回休み"):matchSingle(me,"バイト先で運命の人に出会った")},
+ M("bad","推し活","推しに全額つぎ込む",-25,"限定グッズを全種コンプ"),
+ {c:"money",s:"ネトゲ",t:"ネトゲで最強に",d:me=>{let v=me.hiki?50:15;const nt=has(me,"net");if(nt)v*=2;me.money+=v;return (nt?trig("net"):"")+(me.hiki?`ランキング世界1位。レアアイテムを売って +${v}万`:`寝る間を惜しんでやり込み、アイテムを売って +${v}万`)}},
+ {c:"bad",s:"追放",t:"親に家を追い出される",d:me=>{if(me.hiki){me.hiki=false;me.job={n:"フリーター",p:15};return "ついに家を追い出された。強制的にフリーターに（給料15万）"}me.money-=20;return "実家を出て一人暮らし。引っ越し代 -20万"}},
+ {c:"money",s:"配信",t:"深夜の配信がバズる",d:me=>{let v=me.hiki?60:25;const nt=has(me,"net");if(nt)v*=2;me.money+=v;return `${nt?trig("net"):""}部屋からの雑談配信が大バズり +${v}万${gainP(me,"net",.8)}`}},
+ {c:"spec",s:"夢追い",t:"夢を追ってバンド結成",d:me=>{if(luck(me,.3)){me.money+=70;return lt(me)+"インディーズで大ヒット！ +70万"}me.money-=15;return "ライブの客は3人。機材代 -15万"}},
+ MV("日雇い","日雇いで全国行脚",3,"いろんな現場を渡り歩いて3マス進む"),
+ SK("昼夜逆転","昼夜逆転","気づいたら夕方"),
+ M("money","宝くじ","スクラッチで当たり",20,"なけなしの300円が化けた"),
+ {c:"job",s:"正社員",t:"正社員登用のチャンス",d:me=>{if(me.hiki)return "求人サイトを開いたけど、そっと閉じた";if(Math.random()<.5){me.job={n:"正社員（叩き上げ）",p:35};return "店長に認められて正社員に！給料35万"}return "面接で緊張しすぎて不採用"}},
+ {c:"bad",s:"ガチャ",t:"ソシャゲのガチャ沼",d:me=>{const v=me.hiki?40:20;me.money-=v;return `天井まで回した -${v}万`}},
+];
+POOL.city.push(
+ M("money","eスポーツ","シニアeスポーツ大会",35,"反射神経はまだ健在"),
+ SK("満員電車","満員電車","乗り過ごして一日終わった"),
+ M("bad","推し活","推し活に目覚める",-30,"グッズを全種コンプ"),
+);
+POOL.country.push(
+ M("money","米","新米が評判に",25,"ふるさと納税の返礼品に採用"),
+ MV("軽トラ","軽トラを乗り回す",3,"あぜ道を爆走して3マス進む"),
+ M("bad","雪","大雪で雪かき",-10,"腰を痛めて湿布代"),
+);
+
+// ===== イベントマス用（年齢・仕事に関係なくいつでも起こる。止まるたびに抽選） =====
+POOL.event=[
+ // 事故・ケガ
+ {c:"bad",s:"事故",t:"交通事故",d:me=>{me.money-=20;me.skip=1;return "自転車と接触して入院。治療費 -20万、1回休み"}},
+ SK("骨折","階段で骨折","全治2か月"),
+ SK("インフル","インフルエンザ","高熱で寝込んだ"),
+ SK("食中毒","食中毒","生焼けの肉にあたった"),
+ M("bad","財布","財布を落とす",-10,"中身ごと行方不明"),
+ M("bad","水没","スマホを水没",-10,"トイレに落として買い替え"),
+ M("bad","空き巣","空き巣に入られる",-25,"留守中に現金を盗まれた"),
+ MV("ねんざ","足をねんざ",-2,"ひょこひょこ歩いて2マス戻る"),
+ MV("迷子","道に迷う",-1,"地図アプリを信じすぎて1マス戻る"),
+ // 恋愛
+ {c:"love",s:"告白",t:"告白のチャンス",d:me=>confess(me)},
+ {c:"love",s:"告白",t:"告白のチャンス",d:me=>confess(me)},
+ {c:"love",s:"一目惚れ",t:"一目惚れ",d:me=>matchSingle(me,"街角で一目惚れした")},
+ {c:"love",s:"占い",t:"怪しい占い師",d:me=>{const t=pick(others(me));me.skip=1;return `「運命の人はすぐそばに」と言われ、${nm(t)}を意識しすぎて1回休み`}},
+ {c:"love",s:"相合傘",t:"雨の日の相合傘",d:me=>{const t=pick(others(me));me.skip=1;return `${nm(t)}と相合傘で帰ったら噂が広まり、恥ずかしくて1回休み`}},
+ // ラッキー
+ M("money","拾う","道で封筒を拾う",10,"交番に届けたらお礼をもらった"),
+ M("money","福引","商店街の福引",15,"特賞の商品券"),
+ M("money","宝くじ","宝くじ3等",30,"まさかの当選"),
+ M("money","1等","宝くじ1等",150,"人生最大の幸運"),
+ M("money","遺産","遠い親戚の遺産",40,"会ったこともない親戚から"),
+ MV("追い風","追い風が吹く",2,"いいことが続いて2マス進む"),
+ MV("近道","近道を発見",3,"知らない路地を抜けたら3マス進む"),
+ // 運命
+ {c:"spec",s:"仮想通貨",t:"仮想通貨に全額",d:me=>{if(luck(me,.5)){const g=Math.max(me.money,0);me.money+=g;return `${lt(me)}爆上がり！所持金が倍に +${g}万${gainP(me,"gamble",.6)}`}const l=Math.floor(Math.max(me.money,0)/2);me.money-=l;return `${lt(me)}大暴落…所持金が半分に -${l}万`}},
+ {c:"spec",s:"交換",t:"人生交換",d:me=>{const t=pick(others(me));[me.money,t.money]=[t.money,me.money];return `${nm(t)}と所持金がまるごと入れ替わった`}},
+ {c:"bad",s:"詐欺",t:"投資詐欺",d:me=>{const l=Math.floor(Math.max(me.money,0)*.3);me.money-=l;return `「絶対儲かる」に乗ってしまった -${l}万`}},
+ {c:"spec",s:"神社",t:"神社にお参り",d:me=>shrine(me)},
+];
+
+// ===== ハチャメチャイベント =====
+function swapPos(a,b){[a.pos,b.pos]=[b.pos,a.pos];[a.trail,b.trail]=[b.trail,a.trail];[a.route,b.route]=[b.route,a.route]}
+const CH=(s,t,d)=>({c:"chaos",s,t,d});
+POOL.chaos=[
+ CH("UFO","宇宙人にさらわれる",me=>{me.skip=2;me.money+=50;return "宇宙船で謎の手術。2回休みだけど +50万"+gainP(me,"ufo",.7)}),
+ CH("時間旅行","タイムスリップ",()=>["時空が歪んだ！前の止マスの直後まで戻される",-99]),
+ CH("ワープ","ワープホール",()=>["足元に穴が開いた！次の止マスまで一気にワープ",99]),
+ CH("平等","財産平等化革命",me=>{const tot=P.reduce((a,x)=>a+x.money,0),each=Math.floor(tot/P.length);P.forEach(x=>x.money=each);return `全員の所持金を合計して山分け。全員${each}万に`}),
+ CH("下剋上","下剋上",me=>{const s=[...P].sort((a,b)=>a.money-b.money),lo=s[0],hi=s[s.length-1];[lo.money,hi.money]=[hi.money,lo.money];return `最下位の${nm(lo)}と1位の${nm(hi)}の所持金が入れ替わった`}),
+ CH("隕石","隕石落下",()=>{const h=P.filter(x=>has(x,"hero"));P.forEach(x=>{if(!has(x,"hero"))x.money-=30});return "空から隕石。全員 -30万"+(h.length?` ${trig("hero")}${h.map(nm).join("、")}は剣で隕石を両断して無傷`:"")}),
+ CH("石油","庭から石油",me=>{me.money+=200;return "掘ったら石油が湧いた！ +200万"}),
+ CH("転生","異世界転生",me=>{me.job={n:"勇者",p:50};me.retired=false;me.hiki=false;return "トラックにひかれて異世界へ…なぜか戻ってきて職業が「勇者（給料50万）」に"+gainP(me,"hero",.5)}),
+ CH("お見合","強制お見合いパーティ",()=>{const s=shuffle(P);return `くじ引きで${nm(s[0])}と${nm(s[1])}が強制カップルに！ ${marry(s[0],s[1])}`}),
+ CH("離婚ブーム","離婚ブーム到来",()=>{let c=0;P.forEach(x=>{if(x.spouse!==null){divorce(x);c++}});return c?"なぜか全夫婦が一斉に離婚した":"離婚ブームが来たけど誰も結婚していなかった"}),
+ CH("ベビー","ベビーブーム",()=>{const m=P.filter(x=>x.spouse!==null);m.forEach(x=>x.kids++);return m.length?"既婚者全員に子どもが1人ずつ生まれた！":"ベビーブームなのに既婚者がいない"}),
+ CH("職シャッフル","職業シャッフル",()=>{const w=P.filter(x=>x.job&&!x.retired);if(w.length<2)return "職業シャッフル…するには働いてる人が足りなかった";const js=shuffle(w.map(x=>x.job));w.forEach((x,i)=>x.job=js[i]);return "全員の職業がシャッフルされた！ "+w.map(x=>`${nm(x)}→${x.job.n}`).join("、")}),
+ CH("席替え","人生の席替え",me=>{const t=pick(others(me).filter(x=>!x.done));if(!t)return "席替えしたかったけど相手がいなかった";swapPos(me,t);return `${nm(t)}と現在地がまるごと入れ替わった！`}),
+ CH("もう一回","ボーナスターン",me=>{me.extra=1;return "もう一回サイコロを振れる！"}),
+ CH("大富豪","謎の大富豪",me=>{const g=Math.max(me.money,0);me.money+=g;return `なぜか気に入られて所持金が2倍 +${g}万`}),
+ CH("呪い","呪いの人形",me=>{const t=pick(others(me));const h=Math.floor(Math.max(me.money,0)/2);me.money-=h;t.money-=20;return `拾った人形が呪われていた。所持金半分 -${h}万、押し付けられた${nm(t)}も -20万`+gainP(me,"curse",.5)}),
+ CH("機密","国家機密を知る",me=>`偶然知ってしまった。全員から口止め料20万ずつ${collect(me,20)}`),
+ CH("ゾンビ","ゾンビパニック",me=>{const h=others(me).filter(x=>has(x,"hero"));others(me).forEach(x=>{if(!has(x,"hero"))x.skip=Math.max(x.skip,1)});return "街がゾンビだらけに。自分以外の全員が1回休み"+(h.length?` ${trig("hero")}${h.map(nm).join("、")}はゾンビを蹴散らした`:"")}),
+ CH("発明","世紀の大発明",me=>{if(me.job&&!me.job.r&&!me.retired){me.job.p+=30;return `ノーベル賞級の発明。給料が一生+30万 ${jobTxt(me.job)}`}me.money+=60;return "ノーベル賞級の発明で賞金 +60万"}),
+ CH("怪盗","怪盗の正体",me=>{const t=[...others(me)].sort((a,b)=>b.money-a.money)[0];give(t,me,50);return `世間を騒がせる怪盗の正体はあなただった。${nm(t)}から50万いただいた`}),
+ CH("炎上","SNS大炎上",me=>{if(has(me,"net"))return `${trig("net")}炎上しかけたが、レスバで完全論破して鎮火`;me.money-=40;me.skip=1;return "軽い気持ちの投稿が大炎上。謝罪会見で -40万、1回休み"}),
+ CH("銅像","銅像が建つ",me=>`なぜか駅前に自分の銅像が。全員から拝観料10万ずつ${collect(me,10)}`),
+ CH("双子","生き別れの双子",me=>{const h=Math.floor(Math.max(me.money,0)/2);me.money-=h;return `生き別れの双子が現れて財産の半分を要求 -${h}万`}),
+ CH("ドッキリ","全部ドッキリ",()=>"人生最大のピンチ…と思ったら全部ドッキリだった。何も起きない"),
+ CH("リセット","人生リセットボタン",me=>{const was=me.money;me.money=100;return `押したら所持金が100万に戻った（${was}万→100万）`}),
+ CH("宝の地図","宝の地図",me=>{if(luck(me,.5)){me.money+=120;return lt(me)+"本当に財宝が埋まっていた！ +120万"+gainP(me,"gamble",.6)}me.money-=40;return "掘っても何も出ない。重機レンタル代 -40万"}),
+ CH("化石","恐竜の化石",me=>{me.money+=80;return "裏山から恐竜の化石が出た。博物館が買い取り +80万"}),
+ CH("マグロ","マグロ一本釣り",me=>{me.money+=50;return "初競りで最高値 +50万"}),
+ CH("モテ期","モテ期到来",me=>{const s=singles(me);if(!s.length)return "モテ期が来たけど独身者がいなかった";let t=0;s.forEach(x=>{x.money-=10;t+=10});me.money+=t;return `独身者全員から10万ずつ貢がれた（+${t}万）`}),
+ CH("AI","仕事がAIに奪われる",me=>{if(!me.job||me.retired){me.money-=10;return "AIに話しかけられて気まずかった -10万"}const was=me.job.n;me.job=null;return `${was}の仕事をAIに奪われ無職に（次の止マスで仕事を探そう）`}),
+ CH("大逆転","全員一回休み",()=>{const h=P.filter(x=>has(x,"hero"));P.forEach(x=>{if(!has(x,"hero"))x.skip=Math.max(x.skip,1)});return "大型台風で街が止まった。全員1回休み"+(h.length?` ${trig("hero")}${h.map(nm).join("、")}は台風の目を斬って平常運転`:"")}),
+ CH("占拠","生徒会室を占拠",me=>{others(me).forEach(x=>{x.money-=5});me.money+=5*(P.length-1);return "思い出の生徒会室を占拠して全員から5万ずつ立ち退き料"}),
+];
+// 全イベントにIDを振る（全カット画像はIMG["イベント名"]に入れると表示される）
+Object.values(POOL).forEach(a=>a.forEach(e=>e.id=e.t));
+const IMG={
+  // "宇宙人にさらわれる": "data:image/png;base64,....",
+};
+
+// ===== ボード生成 =====
+let NODES=[],SEGS=[],EVBAG={};
+function add(o){o.id=NODES.length;o.next=[];NODES.push(o);return o}
+// イベントマス：止まるたびに event／chaos プールから抽選（同じものが続かないよう袋から引く）
+const drawEv=p=>{if(!EVBAG[p]||!EVBAG[p].length)EVBAG[p]=shuffle(POOL[p]);return EVBAG[p].pop()};
+function buildBoard(){
+  NODES=[];SEGS=[];EVBAG={};let tails=[];
+  const link=n=>{tails.forEach(t=>NODES[t].next.push(n.id));tails=[n.id]};
+  const bags={};
+  const draw=p=>{if(!bags[p]||!bags[p].length)bags[p]=shuffle(POOL[p]);return bags[p].pop()};
+  // 固定マス（その年代のプール）とイベントマス（k:"rand"）を混ぜる。ev＝イベントマスの割合、chaos＝イベントマスでハチャメチャが出る確率
+  const line=(pool,len,fixed=[],o={})=>{
+    const ev=o.ev??.35,chaos=o.chaos??.4,items=fixed.map(f=>({...f}));
+    while(items.length<len)items.push(Math.random()<ev?{k:"rand",chaos}:{k:"ev",ev:draw(pool)});
+    return shuffle(items).map(it=>{const n=add(it);link(n);return n.id});
+  };
+  const stop=(kind,s,t)=>{const n=add({k:"stop",stop:true,kind,s,t});link(n);return n};
+  const fork=(f,lanes)=>{
+    const ends=[],out=[];f.lanes=lanes.map(L=>({name:L.name,dice:L.dice}));
+    lanes.forEach(L=>{tails=[f.id];const ids=line(L.pool,L.len,L.fixed||[],L);ends.push(...tails);out.push({name:L.name,dice:L.dice,ids})});
+    tails=ends;return out;
+  };
+  const PAY={k:"pay"},TUI={k:"cost",s:"学費",v:-25,t:"大学の学費"},RENT={k:"cost",s:"家賃",v:-15,t:"家賃の支払い"};
+  const st=add({k:"start",s:"入学"});tails=[st.id];
+  const school=line("school",16);
+  const grad=stop("fork","卒業","卒業・進路");
+  SEGS.push({stage:"学生時代",note:"入学〜卒業",ids:[st.id,...school,grad.id]});
+  SEGS.push({stage:"進路",note:"サイコロで分岐",fork:fork(grad,[
+    {name:"大学コース",dice:[1,2],pool:"campus",len:12,fixed:[TUI,TUI,TUI]},
+    {name:"就職コース",dice:[3,5],pool:"work",len:8,fixed:[PAY,PAY]},
+    {name:"フリーターコース",dice:[6,6],pool:"freeter",len:10,fixed:[PAY,PAY],ev:.4,chaos:.5}])});
+  const jb=stop("job","職業","職業選択");
+  SEGS.push({stage:"社会人",note:"働き盛り",ids:[jb.id,...line("work",18,[PAY,PAY,PAY,PAY]),stop("wed","結婚","結婚式場").id]});
+  const home=stop("fork","住まい","住まい選び");
+  SEGS.push({stage:"新生活",note:"サイコロで分岐",head:home.id,fork:fork(home,[
+    {name:"持ち家コース",dice:[1,3],pool:"family",len:10,fixed:[PAY,PAY]},
+    {name:"賃貸コース",dice:[4,6],pool:"family",len:10,fixed:[PAY,PAY,RENT,RENT]}])});
+  SEGS.push({stage:"子育て",note:"にぎやかな毎日",ids:[...line("family",16,[PAY,PAY,PAY]),stop("turn","転機","人生の転機").id]});
+  const mid=stop("fork","岐路","中年の岐路");
+  SEGS.push({stage:"中年期",note:"サイコロで分岐",head:mid.id,fork:fork(mid,[
+    {name:"出世街道",dice:[1,4],pool:"middle",len:14,fixed:[PAY,PAY,PAY,PAY],ev:.25,chaos:.25},
+    {name:"脱サラ自由人",dice:[5,6],pool:"middle",len:12,fixed:[PAY],ev:.6,chaos:.8}])});
+  const ret=stop("retire","定年","定年退職");
+  SEGS.push({stage:"老後",note:"サイコロで分岐",head:ret.id,fork:fork(ret,[
+    {name:"都会でセカンドライフ",dice:[1,2],pool:"city",len:9,fixed:[PAY]},
+    {name:"田舎でスローライフ",dice:[3,4],pool:"country",len:9,fixed:[PAY]},
+    {name:"海外移住",dice:[5,6],pool:"abroad",len:9,fixed:[PAY],ev:.45,chaos:.6}])});
+  const lastIds=line("elder",14,[PAY,PAY]);
+  const goal=add({k:"goal",s:"ゴール"});link(goal);
+  SEGS.push({stage:"晩年",note:"人生のしめくくり",ids:[...lastIds,goal.id]});
+}
+
+// ===== セットアップ =====
+function drawSetup(){
+  const c=$("count");c.innerHTML="";
+  [2,3,4].forEach(n=>{const b=document.createElement("button");b.textContent=n+"人";b.setAttribute("aria-pressed",n===N);b.onclick=()=>{N=n;drawSetup()};c.appendChild(b)});
+  const box=$("names");const old=[...box.querySelectorAll("input[type=text]")].map(i=>i.value);box.innerHTML="";
+  for(let i=0;i<N;i++){const l=document.createElement("div");l.className="nr";
+    l.innerHTML=`<span class="dot" style="background:${COLORS[i]}"></span><input type="text" id="nm${i}" maxlength="8" aria-label="プレイヤー${i+1}の名前"><label class="bot"><input type="checkbox" id="bot${i}">BOT</label>`;
+    box.appendChild(l);l.querySelector("input[type=text]").value=old[i]??DEF[i];
+    const cb=l.querySelector("input[type=checkbox]");cb.checked=BOTS[i];cb.onchange=()=>{BOTS[i]=cb.checked;drawAllBtn()}}
+  drawAllBtn();
+}
+function drawAllBtn(){$("allbot").textContent=BOTS.slice(0,N).every(Boolean)?"全員BOTを解除":"全員BOTにする"}
+$("allbot").onclick=()=>{const all=BOTS.slice(0,N).every(Boolean);for(let i=0;i<N;i++)BOTS[i]=!all;drawSetup()};
+$("start").onclick=()=>{
+  buildBoard();
+  P=[];for(let i=0;i<N;i++){P.push({name:$("nm"+i).value.trim()||DEF[i],color:COLORS[i],bot:BOTS[i],pos:0,trail:[],route:{},
+    money:100,kids:0,grand:0,spouse:null,job:null,uni:false,edu:"high",eduName:"在学中",black:false,hiki:false,pass:[],cnt:{},house:false,retired:false,skip:0,done:false,marriages:0,divorces:0})}
+  cur=0;goalOrder=0;turns=0;gameId++;busy=false;$("log").innerHTML="";$("choices").innerHTML="";$("die").textContent="?";
+  $("setup").hidden=true;$("result").hidden=true;$("game").hidden=false;
+  showEvent("入学式","全員、所持金100万円で人生スタート！");log("入学式。全員の人生が始まった。");
+  render();$("roll").disabled=false;botTick();
+};
+$("speed").onchange=e=>{SPD=parseFloat(e.target.value)};
+$("pause").onclick=()=>{paused=!paused;$("pause").textContent=paused?"BOT再開":"BOT一時停止";if(!paused)botTick()};
+function botTick(){
+  const id=gameId;if(paused||busy||$("game").hidden||!P[cur]||!P[cur].bot)return;
+  setTimeout(()=>{if(id===gameId&&!paused&&!busy&&!$("game").hidden&&P[cur].bot)$("roll").onclick()},600*SPD);
+}
+
+// ===== 描画 =====
+function tileInfo(n){
+  if(n.k==="ev")return{c:n.ev.c,l:n.ev.s,t:`${n.ev.t}（固定マス）`};
+  if(n.k==="rand")return{c:n.chaos>=.6?"rand chaos":"rand",l:"？",t:`イベントマス：止まるたびに何が起きるかランダム（ハチャメチャ率${Math.round(n.chaos*100)}%）`};
+  if(n.k==="pay")return{c:"job",l:"給料",t:"給料日：職業の給料がもらえる（定年後は年金15万）"};
+  if(n.k==="cost")return{c:"bad",l:n.s,t:`${n.t}：${n.v}万`};
+  if(n.k==="stop")return{c:"stop",l:n.s,t:`止マス「${n.t}」：必ず止まる`};
+  if(n.k==="start")return{c:"start",l:"入学",t:"スタート"};
+  return{c:"goal",l:"ゴール",t:"ゴール：早い順にボーナス"};
+}
+function tileHTML(id,hit){
+  const n=NODES[id],i=tileInfo(n);
+  const toks=P.filter(x=>x.pos===id).map(x=>`<span class="dot" style="background:${x.color}"></span>`).join("");
+  return `<button class="sq ${i.c}${hit===id?" hit":""}" data-id="${id}" aria-label="${esc(i.t)}"><span class="l">${esc(i.l)}</span><span class="toks">${toks}</span></button>`;
+}
+function render(hit){
+  const b=$("board");const st=b.scrollTop;
+  b.innerHTML=SEGS.map(s=>{
+    if(s.fork)return `<div class="seg">${s.head!==undefined?`<div class="tiles">${tileHTML(s.head,hit)}</div>`:""}<div class="fork"><div class="stg">${s.stage}<em>${s.note}</em></div><div class="lanes">${
+      s.fork.map(L=>`<div class="lane"><span class="ln">${L.name}<small>出目${L.dice[0]}〜${L.dice[1]}</small></span><div class="tiles">${L.ids.map(id=>tileHTML(id,hit)).join("")}</div></div>`).join("")}</div></div></div>`;
+    return `<div class="seg"><div class="stg">${s.stage}<em>${s.note}</em></div><div class="tiles">${s.ids.map(id=>tileHTML(id,hit)).join("")}</div></div>`;
+  }).join("");
+  b.scrollTop=st;
+  if(hit!==undefined){const el=b.querySelector(`[data-id="${hit}"]`);if(el){const br=b.getBoundingClientRect(),er=el.getBoundingClientRect();if(er.top<br.top||er.bottom>br.bottom)b.scrollTop+=er.top-br.top-br.height/2}}
+  const me=P[cur];
+  $("turns").textContent=turns+"ターン";
+  $("who").innerHTML=`いまの手番${me.bot?"（BOT）":""}<b><span class="dot" style="background:${me.color}"></span>${esc(me.name)}</b>`;
+  $("ps").innerHTML=P.map((x,i)=>`<div class="p${i===cur?" now":""}">
+    <div class="nm"><span class="dot" style="background:${x.color}"></span>${esc(x.name)}${x.bot?'<span class="tag b">BOT</span>':""}${x.done?'<span class="tag">ゴール</span>':""}</div>
+    <div class="row"><span>所持金</span><span>${x.money}万</span></div>
+    <div class="row"><span>職業</span><span>${x.retired?"年金生活":x.job?x.job.n:x.hiki?"引きこもり":"学生"}</span></div>
+    <div class="row"><span>学歴</span><span>${x.eduName}</span></div>
+    <div class="row"><span>配偶者</span><span>${x.spouse!==null?esc(P[x.spouse].name):"—"}</span></div>
+    <div class="row"><span>子ども／孫</span><span>${x.kids}人／${x.grand}人</span></div>
+    <div class="row"><span>住まい</span><span>${x.house?"持ち家":"—"}</span></div>${x.pass.length?`<div class="chips">${x.pass.map(k=>`<span class="chip" data-k="${k}">${PASS[k].n}</span>`).join("")}</div>`:""}</div>`).join("");
+}
+$("board").addEventListener("click",e=>{const t=e.target.closest(".sq");if(!t)return;const i=tileInfo(NODES[+t.dataset.id]);$("info").textContent=i.t});
+function log(t){const d=document.createElement("div");d.innerHTML=t;$("log").prepend(d)}
+function cutHTML(c){
+  if(!c)return "";
+  const img=IMG[c.key];
+  return `<div class="cut ${c.c}">${img?`<img src="${img}" alt="${esc(c.key)}">`:`<span class="mk">CUT</span><span class="big">${esc(c.s)}</span>`}</div>`;
+}
+function showEvent(title,body,cut){$("event").innerHTML=`${cutHTML(cut)}<span class="et">${title}</span>${body}`}
+function say(me,title,body,cut){showEvent(title,`${nm(me)}：${body}`,cut);log(`【${title}】${nm(me)}：${body}`)}
+
+function choose(me,opts){
+  return new Promise(res=>{
+    const box=$("choices");box.innerHTML="";
+    if(me.bot){box.innerHTML=opts.map(o=>`<button class="ch" disabled>${o}</button>`).join("");const i=rnd(opts.length);
+      setTimeout(()=>{box.innerHTML="";res(i)},700*SPD);return}
+    opts.forEach((o,i)=>{const b=document.createElement("button");b.className="ch";b.innerHTML=o;b.onclick=()=>{box.innerHTML="";res(i)};box.appendChild(b)});
+  });
+}
+
+// ===== 移動 =====
+async function walk(me,n){
+  for(let i=0;i<n;i++){
+    const node=NODES[me.pos];if(!node.next.length)break;
+    const nx=node.next.length>1?node.next[me.route[node.id]??0]:node.next[0];
+    me.trail.push(me.pos);me.pos=nx;render(nx);await sleep(130);
+    if(NODES[nx].stop||NODES[nx].k==="goal")break;
+  }
+}
+async function back(me,n){
+  for(let i=0;i<n;i++){
+    if(!me.trail.length)break;const prev=me.trail[me.trail.length-1];
+    if(NODES[prev].stop||NODES[prev].k==="start")break;
+    me.pos=me.trail.pop();render(me.pos);await sleep(130);
+  }
+}
+
+// ===== 止マス =====
+function offerJobs(me,k){
+  if(me.edu==="march")return shuffle(JOBS.filter(j=>j.uni)).slice(0,k);
+  const pool=shuffle(JOBS.filter(j=>me.uni||!j.uni));
+  if(me.uni){const u=shuffle(JOBS.filter(j=>j.uni));return shuffle([...new Set([u[0],u[1],...pool])]).slice(0,k)}
+  return pool.slice(0,k);
+}
+async function rollDie(){
+  const die=$("die");
+  if(SPD>0){die.classList.add("roll");for(let k=0;k<12;k++){die.textContent=rnd(6)+1;await sleep(70)}}
+  const n=rnd(6)+1;die.textContent=n;die.classList.remove("roll");return n;
+}
+const SUB={
+  "大学コース":{t:"どの大学に進む？",r:[
+    {d:[1,1],n:"MARCH合格",x:me=>{me.edu="march";me.uni=true;me.eduName="MARCH卒";return gain(me,"elite")},m:"難関大に合格！高給の職業が選び放題"},
+    {d:[2,5],n:"一般大学",x:me=>{me.edu="uni";me.uni=true;me.eduName="大卒"},m:"そこそこの大学でキャンパスライフ"},
+    {d:[6,6],n:"Fラン大学",x:me=>{me.edu="f";me.uni=false;me.eduName="Fラン卒"},m:"名前を書いたら受かった。学費だけはしっかりかかる"}]},
+  "就職コース":{t:"どこに就職する？",pre:me=>{me.eduName="高卒"},r:[
+    {d:[1,1],n:"大企業",x:me=>{me.job={n:"大企業社員",p:50}},m:"一流企業に内定！給料50万"},
+    {d:[2,3],n:"中堅企業",x:me=>{me.job={n:"中堅企業社員",p:38}},m:"安定の中堅企業。給料38万"},
+    {d:[4,5],n:"地元の中小企業",x:me=>{me.job={n:"地元企業社員",p:30}},m:"地元密着で残業少なめ。給料30万"},
+    {d:[6,6],n:"ブラック企業",x:me=>{me.job={n:"ブラック企業社員",p:45};me.black=true;return gain(me,"slave")},m:"給料45万…だけど給料日に過労で倒れることがある"}]},
+  "フリーターコース":{t:"就活に失敗…この先は？",pre:me=>{me.eduName="高卒"},r:[
+    {d:[1,5],n:"バイト生活",x:me=>{me.job={n:"フリーター",p:15}},m:"コンビニと居酒屋を掛け持ち。給料15万"},
+    {d:[6,6],n:"引きこもり",x:me=>{me.job=null;me.hiki=true;return gain(me,"net")},m:"部屋から出なくなった。収入は親からのお小遣い3万"}]}
+};
+const rg=d=>d[0]===d[1]?`${d[0]}`:`${d[0]}〜${d[1]}`;
+async function diceTable(me,title,lead,rows,cutS){
+  showEvent(title+"（サイコロで決定）",`${lead}<br>${rows.map(r=>`${rg(r.d)}：${r.n}`).join("<br>")}`,{key:title,s:cutS,c:"stop"});
+  await choose(me,["サイコロを振る"]);
+  const n=await rollDie();
+  log(`<span style="color:var(--muted)">${nm(me)}の「${title}」サイコロ：${n}</span>`);
+  await sleep(300);
+  return rows.find(r=>n>=r.d[0]&&n<=r.d[1]);
+}
+async function subRoll(me,L){
+  const tb=SUB[L.name];if(!tb)return;
+  showEvent(`${L.name}：2回目のサイコロ`,`${tb.t}<br>${tb.r.map(e=>`${e.d[0]===e.d[1]?e.d[0]:e.d[0]+"〜"+e.d[1]}：${e.n}`).join("<br>")}`,{key:L.name,s:L.name,c:"stop"});
+  await choose(me,["2回目のサイコロを振る"]);
+  const n=await rollDie();const e=tb.r.find(r=>n>=r.d[0]&&n<=r.d[1]);if(tb.pre)tb.pre(me);const pg=e.x(me)||"";
+  log(`<span style="color:var(--muted)">${nm(me)}の2回目のサイコロ：${n}</span>`);
+  say(me,L.name,`出目${n}で<b>${e.n}</b>！ ${e.m}${pg}`,{key:e.n,s:e.n,c:e.n==="引きこもり"||e.n==="ブラック企業"||e.n==="Fラン大学"?"bad":"stop"});
+  await sleep(700);
+}
+async function forkRoll(me,node,title){
+  const opts=node.lanes.map(L=>`${L.dice[0]}〜${L.dice[1]}：${L.name}`).join("<br>");
+  showEvent(title+"（サイコロで分岐）",`${nm(me)}の運命は？<br>${opts}`,{key:node.t,s:node.s,c:"stop"});
+  await choose(me,["サイコロを振って運命を決める"]);
+  const n=await rollDie();
+  const i=node.lanes.findIndex(L=>n>=L.dice[0]&&n<=L.dice[1]);
+  me.route[node.id]=i;log(`<span style="color:var(--muted)">${nm(me)}の分岐サイコロ：${n}</span>`);
+  return i;
+}
+const STOPS={
+  async fork(me,node){
+    const i=await forkRoll(me,node,node.t);const L=node.lanes[i];
+    if(SUB[L.name]){say(me,node.t,`出目で<b>${L.name}</b>に決定！`,{key:L.name,s:L.name,c:"stop"});await sleep(600);await subRoll(me,L);return}
+    let extra="";
+    if(L.name==="持ち家コース"){me.house=true;me.money-=80;extra="マイホーム購入 -80万（ゴール時に+120万の価値）"}
+    if(L.name==="賃貸コース")extra="身軽な賃貸暮らし";
+    if(L.name==="脱サラ自由人")extra="ハチャメチャな人生の始まり";
+    say(me,node.t,`<b>${L.name}</b>へ！ ${extra}`,{key:node.t,s:L.name,c:"stop"});
+  },
+  async job(me){
+    const keep=me.job||me.hiki;let rows;
+    if(keep){
+      let js=offerJobs(me,4).filter(j=>!me.job||j.n!==me.job.n);
+      while(js.length<3){const j=pick(JOBS.filter(x=>!x.uni&&!js.includes(x)));js.push(j)}
+      rows=[{d:[1,3],n:me.job?`今の職場を続ける（${me.job.n}）`:"引きこもりを続ける",keep:1},...js.slice(0,3).map((j,i)=>({d:[4+i,4+i],n:jobTxt(j),j}))];
+    }else rows=offerJobs(me,6).map((j,i)=>({d:[i+1,i+1],n:jobTxt(j),j}));
+    const r=await diceTable(me,"職業選択",`${nm(me)}の仕事はサイコロで決まる`,rows,"職業");
+    if(r.keep){say(me,"職業選択",me.job?`${me.job.n}を続けることになった`:"部屋から出ないことが決まった",{key:"職業選択",s:me.job?me.job.n:"引きこもり",c:"job"});return}
+    me.job={...r.j};me.black=false;me.hiki=false;
+    say(me,"職業選択",`${jobTxt(me.job)}になった！`,{key:"職業選択",s:me.job.n,c:"job"});
+  },
+  async wed(me){
+    if(has(me,"solo")){say(me,"結婚式場",soloBonus(me),{key:"結婚式場",s:"独身",c:"money"});return}
+    if(me.spouse!==null){say(me,"結婚式場",`すでに既婚。結婚記念パーティで全員から5万ずつご祝儀${collect(me,5)}`,{key:"結婚式場",s:"記念日",c:"love"});return}
+    const t=pick(others(me).filter(x=>!has(x,"solo")).length?others(me).filter(x=>!has(x,"solo")):others(me));
+    const r=await diceTable(me,"結婚式場",`${nm(me)}が${nm(t)}にプロポーズ！ 結果はサイコロ次第`,[
+      {d:[1,3],n:`プロポーズ成功${t.spouse!==null?"（略奪愛）":""}`,r:"ok"},
+      {d:[4,5],n:"フラれる（傷心旅行 -10万）",r:"no"},
+      {d:[6,6],n:"大玉砕（-20万・パッシブ「生涯独身」）",r:"ng"}],"結婚");
+    if(r.r==="ok")say(me,"結婚式場",`${nm(t)}へのプロポーズ成功！ ${marry(me,t)}`,{key:"結婚式場",s:"結婚",c:"love"});
+    else if(r.r==="no"){me.money-=10;say(me,"結婚式場",`${nm(t)}にフラれた。傷心旅行 -10万`,{key:"フラれる",s:"失恋",c:"bad"})}
+    else{me.money-=20;say(me,"結婚式場",`${nm(t)}に大玉砕。式場のキャンセル料 -20万。もう恋はしない…${gain(me,"solo")}`,{key:"玉砕",s:"玉砕",c:"bad"})}
+  },
+  async turn(me){
+    const nj=offerJobs(me,3).filter(j=>!me.job||j.n!==me.job.n)[0]||pick(JOBS.filter(x=>!x.uni));
+    const r=await diceTable(me,"人生の転機",`${nm(me)}の人生が動く…いまは${me.job?jobTxt(me.job):"無職"}`,[
+      {d:[1,3],n:"今の生活を続ける（勤続手当 +10万）",r:"keep"},
+      {d:[4,5],n:`転職：${jobTxt(nj)}`,r:"sw"},
+      {d:[6,6],n:"脱サラして起業家に（給料0〜120万）",r:"ent"}],"転機");
+    if(r.r==="keep"){me.money+=10;say(me,"人生の転機","今の生活を続けることに。勤続手当 +10万",{key:"人生の転機",s:"継続",c:"job"});return}
+    const was=me.job?me.job.n:"無職";
+    me.job=r.r==="sw"?{...nj}:{n:"起業家",r:[0,120]};me.black=false;me.hiki=false;
+    say(me,"人生の転機",`${was}から${jobTxt(me.job)}へ！`,{key:"人生の転機",s:me.job.n,c:"job"});
+  },
+  async retire(me,node){
+    const base=me.job?(me.job.r?Math.round((me.job.r[0]+me.job.r[1])/2):me.job.p):10;const pay=base*3;
+    me.retired=true;me.money+=pay;
+    say(me,"定年退職",`長年おつかれさま！退職金 +${pay}万`,{key:"定年退職",s:"定年",c:"stop"});
+    await sleep(500);
+    const i=await forkRoll(me,node,"老後の過ごし方");
+    say(me,"定年退職",`老後は<b>${node.lanes[i].name}</b>！`,{key:node.lanes[i].name,s:node.lanes[i].name,c:"stop"});
+  }
+};
+
+// ===== マスの処理 =====
+async function land(me,depth=0){
+  const node=NODES[me.pos];
+  if(node.k==="pay"){if(me.black&&me.job&&!me.retired&&Math.random()<.35){me.skip=1;say(me,"給料日","給料は出たけど過労でダウン。1回休み",{key:"過労",s:"過労",c:"bad"});const v=salary(me);me.money+=v;render(me.pos);return}let v=salary(me),x="";
+    if(has(me,"rich")){v+=10;x+=` ${trig("rich")}+10万`}
+    if(has(me,"elite")&&!me.retired){v+=5;x+=` ${trig("elite")}+5万`}
+    if(has(me,"curse")){v-=10;x+=` ${trig("curse")}-10万`}
+    me.money+=v;say(me,"給料日",(me.retired?`年金`:me.job?`${me.job.n}の給料`:me.hiki?`親からお小遣い`:`日雇いバイト代`)+` 計${v>=0?"+":""}${v}万${x}`,{key:"給料日",s:"給料日",c:"job"})}
+  else if(node.k==="cost"){me.money+=node.v;say(me,node.t,`${node.v}万`)}
+  else if(node.k==="stop"){await STOPS[node.kind](me,node)}
+  else if(node.k==="goal"){
+    const bonus=[60,40,20,0][goalOrder]??0;goalOrder++;me.done=true;me.money+=bonus;
+    say(me,"ゴール",`${goalOrder}着でゴール！ボーナス +${bonus}万`,{key:"ゴール",s:"ゴール",c:"stop"});
+  }
+  else if(node.k==="ev"||node.k==="rand"){
+    const ev=node.k==="ev"?node.ev:drawEv(Math.random()<node.chaos?"chaos":"event");
+    const r=ev.d(me);const txt=Array.isArray(r)?r[0]:r;
+    say(me,(node.k==="rand"?"イベント！ ":"")+ev.t,txt,{key:ev.id,s:ev.s,c:ev.c});
+    if(Array.isArray(r)&&depth<2){const from=me.pos;await sleep(600);if(r[1]>0)await walk(me,r[1]);else await back(me,-r[1]);await sleep(300);if(me.pos!==from&&NODES[me.pos].k!=="start")await land(me,depth+1)}
+  }
+  render(me.pos);
+}
+
+// ===== 手番 =====
+$("roll").onclick=async()=>{
+  if(busy)return;busy=true;$("roll").disabled=true;
+  const id=gameId,me=P[cur];turns++;
+  if(me.skip>0){me.skip--;say(me,"お休み","今回は休み…");await sleep(700);if(id===gameId)next();return}
+  const die=$("die");
+  if(SPD>0){die.classList.add("roll");for(let i=0;i<10;i++){die.textContent=rnd(6)+1;await sleep(60)}}
+  let n=rnd(6)+1;die.textContent=n;die.classList.remove("roll");
+  if(id!==gameId)return;
+  log(`<span style="color:var(--muted)">${nm(me)}のサイコロ：${n}</span>`);
+  if(has(me,"ufo")){n++;log(`${trig("ufo")}${nm(me)}の出目が+1されて${n}に`)}
+  await walk(me,n);if(id!==gameId)return;
+  await land(me);if(id!==gameId)return;
+  if(me.extra&&!me.done){me.extra=0;render();busy=false;$("roll").disabled=false;botTick();return}
+  me.extra=0;next();
+};
+function next(){
+  if(P.every(x=>x.done)){const id=gameId;setTimeout(()=>{if(id===gameId)showResult()},900*SPD);return}
+  do{cur=(cur+1)%P.length}while(P[cur].done);
+  render();busy=false;$("roll").disabled=false;botTick();
+}
+function showResult(){
+  const r=P.map(x=>({...x,score:x.money+x.kids*30+x.grand*10+(x.house?120:0)})).sort((a,b)=>b.score-a.score);
+  const titleOf=x=>x.kids>=6?"大家族の長":x.marriages>=3?"恋多き人生":x.divorces>=2?"波乱万丈":x.money>=600?"大富豪":x.marriages===0?"孤高の天才":x.money<0?"借金まみれ":x.grand>=4?"孫に囲まれた老後":"平凡こそ幸せ";
+  $("rank").innerHTML=r.map((x,i)=>`<div class="r"><div class="pos">${i+1}</div>
+    <div><div style="display:flex;align-items:center;gap:6px;font-weight:900"><span class="dot" style="background:${x.color}"></span>${esc(x.name)}</div>
+    <div class="title">${titleOf(x)}</div><div style="font-size:12px;color:var(--muted)">${x.job?x.job.n:x.hiki?"引きこもり":"無職"}・${x.eduName}・${x.money}万・子${x.kids}・孫${x.grand}・結婚${x.marriages}回${x.house?"・持ち家":""}</div></div>
+    <div class="sc">${x.score}</div></div>`).join("");
+  $("game").hidden=true;$("result").hidden=false;busy=false;
+}
+function toSetup(){gameId++;$("game").hidden=true;$("result").hidden=true;$("setup").hidden=false;busy=false;$("choices").innerHTML="";drawSetup()}
+$("reset").onclick=toSetup;$("again").onclick=toSetup;
+// パッシブのツールチップ：PCはホバー、スマホは長押し
+const tip=document.createElement("div");tip.className="tip";tip.hidden=true;document.body.appendChild(tip);
+function showTip(el){const p=PASS[el.dataset.k];if(!p)return;tip.innerHTML=`<b>${p.n}</b>${p.d}`;tip.hidden=false;
+  const r=el.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight;
+  tip.style.left=Math.min(Math.max(8,r.left+r.width/2-w/2),innerWidth-w-8)+"px";
+  tip.style.top=(r.top-h-8<8?r.bottom+8:r.top-h-8)+"px"}
+const hideTip=()=>{tip.hidden=true};
+let lp;
+document.addEventListener("pointerover",e=>{if(e.pointerType!=="mouse")return;const c=e.target.closest&&e.target.closest(".chip");c?showTip(c):hideTip()});
+document.addEventListener("pointerdown",e=>{if(e.pointerType==="mouse")return;hideTip();clearTimeout(lp);
+  const c=e.target.closest&&e.target.closest(".chip");if(!c)return;const x=e.clientX,y=e.clientY;
+  lp=setTimeout(()=>{const el=c.isConnected?c:(document.elementFromPoint(x,y)||document.body).closest(".chip");if(el)showTip(el)},400)});
+["pointerup","pointercancel"].forEach(t=>document.addEventListener(t,e=>{if(e.pointerType!=="mouse")clearTimeout(lp)}));
+document.addEventListener("contextmenu",e=>{if(e.target.closest&&e.target.closest(".chip"))e.preventDefault()});
+addEventListener("scroll",hideTip,true);
+$("plist").innerHTML=Object.values(PASS).map(p=>`<dt>${p.n}</dt><dd>${p.d}<br><small>入手条件：${p.c}</small></dd>`).join("");
+drawSetup();
+</script>
+</body>
+</html>
